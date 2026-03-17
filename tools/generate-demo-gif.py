@@ -320,7 +320,7 @@ def make_gif():
         frames.append(render_frinkiac_text_frame(demo1))
         durations.append(4000)
 
-    # ── Scene 2: ASCII art rendering (jp2a mode) ────────────────────────────
+    # ── Scene 2: Another screenshot (different scene) ──────────────────────
 
     frames.append(render_thinking_frame("\u28fb Thinking..."))
     durations.append(600)
@@ -328,8 +328,7 @@ def make_gif():
     demo2 = DEMOS[1]
     ss2 = screenshots.get(demo2["episode"])
     if ss2:
-        ascii_lines = image_to_ascii_art(ss2, cols=ASCII_COLS)
-        frames.append(render_ascii_art_frame(demo2, ascii_lines))
+        frames.append(render_screenshot_frame(demo2, ss2, mode_label="chafa"))
         durations.append(3500)
     else:
         frames.append(render_frinkiac_text_frame(demo2))
