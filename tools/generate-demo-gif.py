@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Generate an animated GIF demo of the Frinkiac thinking hook."""
 
+import io
 import os
+import urllib.request
 from PIL import Image, ImageDraw, ImageFont
 
 # ── Config ───────────────────────────────────────────────────────────────────
@@ -15,38 +17,43 @@ CYAN = (137, 220, 235)   # cyan accent
 YELLOW = (249, 226, 175) # yellow accent
 DIM = (108, 112, 134)    # dimmed text
 ORANGE = (250, 179, 135) # orange
+MAGENTA = (245, 194, 231) # magenta for mode labels
 
 LINE_H = 22
 PADDING = 20
 FONT_SIZE = 16
+ASCII_COLS = 40  # width of ASCII art in characters (compact for demo)
 
 # ── Simpsons quotes for the demo ────────────────────────────────────────────
 
 DEMOS = [
     {
-        "episode": "S05E09",
+        "episode": "S05E18",
+        "timestamp": "433715",
         "quote": [
-            "Kids, you tried your best",
+            "Kids, you tried your best,",
             "and you failed miserably.",
             "The lesson is, never try.",
         ],
-        "url": "https://frinkiac.com/img/S05E09/883882.jpg",
+        "url": "https://frinkiac.com/img/S05E18/433715.jpg",
     },
     {
-        "episode": "S08E02",
+        "episode": "S10E19",
+        "timestamp": "1234566",
         "quote": [
-            "Everything's coming up Milhouse!",
+            "Everything's comin' up Milhouse!",
         ],
-        "url": "https://frinkiac.com/img/S08E02/580646.jpg",
+        "url": "https://frinkiac.com/img/S10E19/1234566.jpg",
     },
     {
-        "episode": "S06E13",
+        "episode": "S08E18",
+        "timestamp": "1307739",
         "quote": [
-            "To alcohol!",
-            "The cause of, and solution to,",
+            "To alcohol--",
+            "The cause of and solution to",
             "all of life's problems.",
         ],
-        "url": "https://frinkiac.com/img/S06E13/1089988.jpg",
+        "url": "https://frinkiac.com/img/S08E18/1307739.jpg",
     },
 ]
 
@@ -76,6 +83,56 @@ def draw_terminal_frame(draw, y, text, color=FG):
     return y + LINE_H
 
 
+# ── Fetch a Frinkiac screenshot and convert to ASCII block art ───────────────
+
+# ASCII art chars from dark to light
+ASCII_CHARS = " .:-=+*#%@"
+
+
+def fetch_screenshot(url):
+    """Download a Frinkiac screenshot and return a PIL Image."""
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "frinkiac-demo/1.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return Image.open(io.BytesIO(resp.read()))
+    except Exception as e:
+        print(f"  Warning: Could not fetch {url}: {e}")
+        return None
+
+
+def image_to_colored_blocks(img, cols=ASCII_COLS):
+    """Convert an image to rows of (char, r, g, b) for colored block rendering."""
+    img = img.convert("RGB")
+    rows = int(cols * img.height / img.width / 2)  # half-block aspect correction
+    img = img.resize((cols, rows))
+    result = []
+    for y_pos in range(rows):
+        row = []
+        for x_pos in range(cols):
+            r, g, b = img.getpixel((x_pos, y_pos))
+            row.append((r, g, b))
+        result.append(row)
+    return result
+
+
+def image_to_ascii_art(img, cols=ASCII_COLS):
+    """Convert an image to ASCII art strings (monochrome)."""
+    img = img.convert("L")  # grayscale
+    rows = int(cols * img.height / img.width / 2)
+    img = img.resize((cols, rows))
+    lines = []
+    for y_pos in range(rows):
+        line = []
+        for x_pos in range(cols):
+            brightness = img.getpixel((x_pos, y_pos))
+            idx = brightness * (len(ASCII_CHARS) - 1) // 255
+            line.append(ASCII_CHARS[idx])
+        lines.append("".join(line))
+    return lines
+
+
+# ── Frame renderers ──────────────────────────────────────────────────────────
+
 def render_prompt_frame():
     """Render the initial prompt frame."""
     h = PADDING + LINE_H * 4 + PADDING
@@ -103,15 +160,24 @@ def render_thinking_frame(label="Thinking..."):
     return img
 
 
-def render_frinkiac_frame(demo, typing_lines=None):
-    """Render a Frinkiac quote frame (text mode)."""
+def render_frinkiac_text_frame(demo, typing_lines=None):
+    """Render a Frinkiac quote frame (text-only fallback with Homer face)."""
     ep = demo["episode"]
     quote = demo["quote"]
     if typing_lines is not None:
         quote = quote[:typing_lines]
 
-    quote_lines = len(quote)
-    total_lines = 4 + 1 + 1 + 1 + quote_lines + 1 + 1 + 1  # prompt + separator + header + sep + quote + sep + url + blank
+    # Homer face layout: 7 lines for the face art, plus quote lines beside it
+    homer_lines = [
+        "  \u2502",
+        "  \u2502    \u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e",
+        "  \u2502    \u2502 (o  o) \u2502",
+        "  \u2502    \u2502  \\__/  \u2502",
+        "  \u2502    \u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f",
+        "  \u2502",
+    ]
+
+    total_lines = 4 + 1 + 1 + 1 + len(homer_lines) + 1 + 1 + 1
     h = PADDING + LINE_H * total_lines + PADDING
     img = Image.new("RGB", (WIDTH, h), BG)
     draw = ImageDraw.Draw(img)
@@ -124,14 +190,103 @@ def render_frinkiac_frame(demo, typing_lines=None):
     y = draw_terminal_frame(draw, y, "", FG)
 
     # Frinkiac box
-    bar = "═" * 55
-    thin = "─" * 55
+    bar = "\u2550" * 55
+    thin = "\u2500" * 55
     y = draw_terminal_frame(draw, y, f"  {bar}", YELLOW)
     y = draw_terminal_frame(draw, y, f"  \U0001f369 FRINKIAC \u2014 {ep}", ORANGE)
     y = draw_terminal_frame(draw, y, f"  {thin}", YELLOW)
-    for line in quote:
-        y = draw_terminal_frame(draw, y, f"  \u2502 {line}", FG)
+
+    # Homer face with quote beside it
+    for i, homer_line in enumerate(homer_lines):
+        if i == 2 and len(quote) > 0:
+            # First quote line next to face
+            combined = f'{homer_line}   "{quote[0]}'
+            y = draw_terminal_frame(draw, y, combined, FG)
+        elif i == 3 and len(quote) > 1:
+            combined = f"{homer_line}    {quote[1]}"
+            y = draw_terminal_frame(draw, y, combined, FG)
+        elif i == 4 and len(quote) > 2:
+            combined = f"{homer_line}    {quote[2]}"
+            y = draw_terminal_frame(draw, y, combined, FG)
+        else:
+            y = draw_terminal_frame(draw, y, homer_line, YELLOW)
+
     y = draw_terminal_frame(draw, y, f"  {bar}", YELLOW)
+    y = draw_terminal_frame(draw, y, f"  \U0001f517 {demo['url']}", DIM)
+
+    return img
+
+
+def render_colored_block_frame(demo, block_rows):
+    """Render a frame showing the Pillow colored-block rendering of a scene."""
+    ep = demo["episode"]
+    quote = demo["quote"]
+
+    # prompt (4) + mode label (1) + block art rows + separator (1) + quote lines + blank (1)
+    art_rows = len(block_rows)
+    total_lines = 4 + 1 + art_rows + 1 + len(quote) + 1 + 1
+    h = PADDING + LINE_H * total_lines + PADDING
+    img = Image.new("RGB", (WIDTH, h), BG)
+    draw = ImageDraw.Draw(img)
+    y = PADDING
+
+    # Prompt context
+    y = draw_terminal_frame(draw, y, "$ claude", GREEN)
+    y = draw_terminal_frame(draw, y, "", FG)
+    y = draw_terminal_frame(draw, y, "> Refactor the auth module to use JWT tokens", CYAN)
+    y = draw_terminal_frame(draw, y, "", FG)
+
+    # Mode label
+    y = draw_terminal_frame(draw, y, f"  [Python+Pillow] {ep}", MAGENTA)
+
+    # Draw the colored blocks pixel by pixel
+    char_w = FONT_SIZE * 0.6  # approximate monospace char width
+    for row in block_rows:
+        x = PADDING + int(char_w * 2)  # indent
+        for r, g, b in row:
+            draw.text((x, y), "\u2588", fill=(r, g, b), font=FONT)
+            x += int(char_w)
+        y += LINE_H
+
+    # Separator + caption
+    thin = "\u2500" * 55
+    y = draw_terminal_frame(draw, y, f"  {thin}", YELLOW)
+    for line in quote:
+        y = draw_terminal_frame(draw, y, f"  {line}", FG)
+    y = draw_terminal_frame(draw, y, f"  \U0001f517 {demo['url']}", DIM)
+
+    return img
+
+
+def render_ascii_art_frame(demo, ascii_lines):
+    """Render a frame showing jp2a-style ASCII art of a scene."""
+    ep = demo["episode"]
+    quote = demo["quote"]
+
+    total_lines = 4 + 1 + len(ascii_lines) + 1 + len(quote) + 1 + 1
+    h = PADDING + LINE_H * total_lines + PADDING
+    img = Image.new("RGB", (WIDTH, h), BG)
+    draw = ImageDraw.Draw(img)
+    y = PADDING
+
+    # Prompt context
+    y = draw_terminal_frame(draw, y, "$ claude", GREEN)
+    y = draw_terminal_frame(draw, y, "", FG)
+    y = draw_terminal_frame(draw, y, "> Refactor the auth module to use JWT tokens", CYAN)
+    y = draw_terminal_frame(draw, y, "", FG)
+
+    # Mode label
+    y = draw_terminal_frame(draw, y, f"  [jp2a \u2014 ASCII art] {ep}", MAGENTA)
+
+    # ASCII art lines
+    for line in ascii_lines:
+        y = draw_terminal_frame(draw, y, f"  {line}", FG)
+
+    # Separator + caption
+    thin = "\u2500" * 55
+    y = draw_terminal_frame(draw, y, f"  {thin}", YELLOW)
+    for line in quote:
+        y = draw_terminal_frame(draw, y, f"  {line}", FG)
     y = draw_terminal_frame(draw, y, f"  \U0001f517 {demo['url']}", DIM)
 
     return img
@@ -142,47 +297,65 @@ def make_gif():
     frames = []
     durations = []
 
+    # ── Pre-fetch screenshots for the visual demos ───────────────────────────
+    print("Fetching Frinkiac screenshots...")
+    screenshots = {}
+    for demo in DEMOS:
+        print(f"  Fetching {demo['episode']}...")
+        screenshots[demo["episode"]] = fetch_screenshot(demo["url"])
+
+    # ── Scene 1: Colored block rendering (Python+Pillow mode) ────────────────
+
     # Frame 1: prompt (hold 1.5s)
     frames.append(render_prompt_frame())
     durations.append(1500)
 
-    # Frames 2-4: thinking spinner
-    spinners = ["\u28fb Thinking...", "\u28fd Thinking...", "\u28fe Thinking..."]
-    for s in spinners:
+    # Thinking spinner (compact — just 2 frames)
+    for s in ["\u28fb Thinking...", "\u28fe Thinking..."]:
         frames.append(render_thinking_frame(s))
-        durations.append(400)
-
-    # Frame 5+: First quote appears (typing effect)
-    demo = DEMOS[0]
-    for i in range(1, len(demo["quote"]) + 1):
-        frames.append(render_frinkiac_frame(demo, typing_lines=i))
-        durations.append(600)
-
-    # Hold the full quote
-    frames.append(render_frinkiac_frame(demo))
-    durations.append(3000)
-
-    # Second quote (quick flash)
-    frames.append(render_thinking_frame("\u28fb Thinking..."))
-    durations.append(500)
-
-    demo2 = DEMOS[1]
-    frames.append(render_frinkiac_frame(demo2))
-    durations.append(2500)
-
-    # Third quote
-    frames.append(render_thinking_frame("\u28fe Thinking..."))
-    durations.append(500)
-
-    demo3 = DEMOS[2]
-    for i in range(1, len(demo3["quote"]) + 1):
-        frames.append(render_frinkiac_frame(demo3, typing_lines=i))
         durations.append(500)
 
-    frames.append(render_frinkiac_frame(demo3))
-    durations.append(3000)
+    demo1 = DEMOS[0]
+    ss1 = screenshots.get(demo1["episode"])
+    if ss1:
+        block_rows = image_to_colored_blocks(ss1, cols=ASCII_COLS)
+        frames.append(render_colored_block_frame(demo1, block_rows))
+        durations.append(4000)
+    else:
+        # Fallback to text mode
+        frames.append(render_frinkiac_text_frame(demo1))
+        durations.append(4000)
 
-    # Normalize frame sizes (pad to max height)
+    # ── Scene 2: ASCII art rendering (jp2a mode) ────────────────────────────
+
+    frames.append(render_thinking_frame("\u28fb Thinking..."))
+    durations.append(600)
+
+    demo2 = DEMOS[1]
+    ss2 = screenshots.get(demo2["episode"])
+    if ss2:
+        ascii_lines = image_to_ascii_art(ss2, cols=ASCII_COLS)
+        frames.append(render_ascii_art_frame(demo2, ascii_lines))
+        durations.append(3500)
+    else:
+        frames.append(render_frinkiac_text_frame(demo2))
+        durations.append(3500)
+
+    # ── Scene 3: Text-only fallback (Homer face) ─────────────────────────────
+
+    frames.append(render_thinking_frame("\u28fe Thinking..."))
+    durations.append(600)
+
+    demo3 = DEMOS[2]
+    # Show the Homer face text fallback with typing effect
+    for i in range(1, len(demo3["quote"]) + 1):
+        frames.append(render_frinkiac_text_frame(demo3, typing_lines=i))
+        durations.append(500)
+    frames.append(render_frinkiac_text_frame(demo3))
+    durations.append(3500)
+
+    # ── Normalize and save ──────────────────────────────────────────────────
+
     max_h = max(f.height for f in frames)
     normalized = []
     for f in frames:
