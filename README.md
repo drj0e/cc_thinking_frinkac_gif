@@ -15,7 +15,7 @@ Instead of a beep, the hook:
 1. Calls the [Frinkiac API](https://frinkiac.com/api/random) for a random Simpsons moment
 2. Fetches the subtitle/caption for that scene
 3. Generates a captioned GIF URL (text burned into the image)
-4. Renders it in your terminal using `chafa`/`timg`/`viu` — or falls back to a styled text quote
+4. Renders it in your terminal using the best available renderer — from full-color images (`chafa`/`timg`/`viu`) to ASCII art (`jp2a`/Python+Pillow) to a styled text quote
 
 ## Quick Start
 
@@ -64,16 +64,20 @@ If you prefer to set it up yourself, add this to `~/.claude/settings.json` (glob
 - `jq` — parse JSON responses
 
 ### Optional (for image display)
-Pick one terminal image renderer for the full visual experience:
+Pick one terminal image renderer for the full visual experience. The hook tries them in priority order and uses the first one found:
 
-| Tool | Install | Notes |
-|------|---------|-------|
-| **chafa** (recommended) | `brew install chafa` / `apt install chafa` | Best quality, wide terminal support |
-| **timg** | `brew install timg` / `apt install timg` | Good alternative |
-| **viu** | `cargo install viu` | Rust-based, fast |
-| **catimg** | `brew install catimg` / `apt install catimg` | Simple, lightweight |
+| Priority | Tool | Install | Notes |
+|----------|------|---------|-------|
+| 1 | **chafa** (recommended) | `brew install chafa` / `apt install chafa` | Best quality, wide terminal support |
+| 2 | **timg** | `brew install timg` / `apt install timg` | Good alternative |
+| 3 | **viu** | `cargo install viu` | Rust-based, fast |
+| 4 | **catimg** | `brew install catimg` / `apt install catimg` | Simple, lightweight |
+| 5 | **img2sixel** | `brew install libsixel` / `apt install libsixel-bin` | Native Sixel protocol (foot, WezTerm, mlterm) |
+| 6 | **jp2a** | `brew install jp2a` / `apt install jp2a` | ASCII art from the actual scene screenshot! |
+| 7 | **ascii-image-converter** | `go install github.com/TheZoraworker/ascii-image-converter@latest` | Full-color ASCII art |
+| 8 | **Python + Pillow** | `pip install Pillow` | Auto-detected fallback using block characters |
 
-Without any image renderer, you'll still see the Simpsons quote in a nice ASCII text frame.
+Without any image renderer, you'll still see the Simpsons quote in a styled ASCII text frame with a mini Homer.
 
 ## Testing
 
