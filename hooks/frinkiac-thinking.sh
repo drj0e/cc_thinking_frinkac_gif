@@ -59,7 +59,31 @@ IMG_URL="${FRINKIAC_API}/img/${EPISODE}/${TIMESTAMP}.jpg"
 START_TS=$((TIMESTAMP - 2000))
 END_TS=$((TIMESTAMP + 2000))
 [[ $START_TS -lt 0 ]] && START_TS=0
-GIF_URL="${FRINKIAC_API}/gif/${EPISODE}/${START_TS}/${END_TS}.gif?b64lines=$(echo "$SUBTITLE" | base64 -w0 2>/dev/null || echo "$SUBTITLE" | base64 2>/dev/null)"
+
+# Frinkiac burns caption text into the GIF as a single line at the bottom.
+# Long text gets truncated, so pick a short version for the burned-in caption
+# while keeping the full SUBTITLE for display below the image.
+GIF_CAPTION="$SUBTITLE"
+# If the subtitle is too long for one line (~40 chars), try to pick the
+# punchiest/last line (often the punchline), or truncate gracefully.
+if [[ ${#GIF_CAPTION} -gt 40 ]]; then
+  # Try the last subtitle line first (usually the punchline)
+  LAST_LINE=$(echo "$SUBTITLE" | tail -1)
+  if [[ ${#LAST_LINE} -le 40 && ${#LAST_LINE} -gt 5 ]]; then
+    GIF_CAPTION="$LAST_LINE"
+  else
+    # Fall back to first line if it's short enough
+    FIRST_LINE=$(echo "$SUBTITLE" | head -1)
+    if [[ ${#FIRST_LINE} -le 40 ]]; then
+      GIF_CAPTION="$FIRST_LINE"
+    else
+      # Truncate to ~38 chars on a word boundary
+      GIF_CAPTION=$(echo "$SUBTITLE" | tr '\n' ' ' | cut -c1-38 | sed 's/ [^ ]*$//')
+    fi
+  fi
+fi
+
+GIF_URL="${FRINKIAC_API}/gif/${EPISODE}/${START_TS}/${END_TS}.gif?b64lines=$(echo "$GIF_CAPTION" | base64 -w0 2>/dev/null || echo "$GIF_CAPTION" | base64 2>/dev/null)"
 
 # ── 4. Display in terminal ──────────────────────────────────────────────────
 
@@ -174,9 +198,17 @@ echo >&2  # blank line
 
 # Try to show the captioned GIF from Frinkiac first (has burned-in text)
 if display_image "$GIF_URL" "gif"; then
-  : # success — caption is burned into the GIF
+  # GIF has a short caption burned in — print the full subtitle below
+  # so no meaning is lost when the burned-in text was truncated.
+  if [[ "$GIF_CAPTION" != "$SUBTITLE" ]]; then
+    hr
+    echo "$SUBTITLE" | fold -sw "$IMG_COLS" | while IFS= read -r line; do
+      printf '  %s\n' "$line" >&2
+    done
+    hr
+  fi
 elif display_image "$IMG_URL" "jpg"; then
-  : # showed still image — print caption below
+  # Showed still image — always print caption below
   hr
   echo "$SUBTITLE" | fold -sw "$IMG_COLS" | while IFS= read -r line; do
     printf '  %s\n' "$line" >&2
