@@ -22,7 +22,7 @@ MAGENTA = (245, 194, 231) # magenta for mode labels
 LINE_H = 22
 PADDING = 20
 FONT_SIZE = 16
-ASCII_COLS = 40  # width of ASCII art in characters (compact for demo)
+ASCII_COLS = 70  # width of ASCII art in characters
 
 # ── Simpsons quotes for the demo ────────────────────────────────────────────
 
@@ -100,19 +100,11 @@ def fetch_screenshot(url):
         return None
 
 
-def image_to_colored_blocks(img, cols=ASCII_COLS):
-    """Convert an image to rows of (char, r, g, b) for colored block rendering."""
+def screenshot_to_pil_thumbnail(img, target_w, target_h):
+    """Resize a Frinkiac screenshot to fit in target pixel dimensions, preserving aspect."""
     img = img.convert("RGB")
-    rows = int(cols * img.height / img.width / 2)  # half-block aspect correction
-    img = img.resize((cols, rows))
-    result = []
-    for y_pos in range(rows):
-        row = []
-        for x_pos in range(cols):
-            r, g, b = img.getpixel((x_pos, y_pos))
-            row.append((r, g, b))
-        result.append(row)
-    return result
+    img.thumbnail((target_w, target_h), Image.LANCZOS)
+    return img
 
 
 def image_to_ascii_art(img, cols=ASCII_COLS):
@@ -217,17 +209,25 @@ def render_frinkiac_text_frame(demo, typing_lines=None):
     return img
 
 
-def render_colored_block_frame(demo, block_rows):
-    """Render a frame showing the Pillow colored-block rendering of a scene."""
+def render_screenshot_frame(demo, screenshot, mode_label="chafa"):
+    """Render a frame with the actual Frinkiac screenshot embedded (simulates chafa/image renderer)."""
     ep = demo["episode"]
     quote = demo["quote"]
 
-    # prompt (4) + mode label (1) + block art rows + separator (1) + quote lines + blank (1)
-    art_rows = len(block_rows)
-    total_lines = 4 + 1 + art_rows + 1 + len(quote) + 1 + 1
-    h = PADDING + LINE_H * total_lines + PADDING
-    img = Image.new("RGB", (WIDTH, h), BG)
-    draw = ImageDraw.Draw(img)
+    # Calculate image area: leave room for prompt (4 lines), mode label, separator, caption, url
+    header_lines = 5  # prompt (4) + mode label (1)
+    footer_lines = 1 + len(quote) + 1  # separator + quote + url
+    header_h = PADDING + LINE_H * header_lines
+    footer_h = LINE_H * footer_lines + PADDING
+
+    # Scale screenshot to fit within the frame width
+    img_area_w = WIDTH - PADDING * 2 - 40  # some margin
+    img_area_h = 280  # max height for the screenshot
+    thumb = screenshot_to_pil_thumbnail(screenshot.copy(), img_area_w, img_area_h)
+
+    total_h = header_h + thumb.height + 10 + footer_h
+    frame = Image.new("RGB", (WIDTH, total_h), BG)
+    draw = ImageDraw.Draw(frame)
     y = PADDING
 
     # Prompt context
@@ -237,16 +237,12 @@ def render_colored_block_frame(demo, block_rows):
     y = draw_terminal_frame(draw, y, "", FG)
 
     # Mode label
-    y = draw_terminal_frame(draw, y, f"  [Python+Pillow] {ep}", MAGENTA)
+    y = draw_terminal_frame(draw, y, f"  [{mode_label}] {ep}", MAGENTA)
 
-    # Draw the colored blocks pixel by pixel
-    char_w = FONT_SIZE * 0.6  # approximate monospace char width
-    for row in block_rows:
-        x = PADDING + int(char_w * 2)  # indent
-        for r, g, b in row:
-            draw.text((x, y), "\u2588", fill=(r, g, b), font=FONT)
-            x += int(char_w)
-        y += LINE_H
+    # Paste the actual screenshot
+    img_x = PADDING + 20
+    frame.paste(thumb, (img_x, y))
+    y += thumb.height + 10
 
     # Separator + caption
     thin = "\u2500" * 55
@@ -255,7 +251,7 @@ def render_colored_block_frame(demo, block_rows):
         y = draw_terminal_frame(draw, y, f"  {line}", FG)
     y = draw_terminal_frame(draw, y, f"  \U0001f517 {demo['url']}", DIM)
 
-    return img
+    return frame
 
 
 def render_ascii_art_frame(demo, ascii_lines):
@@ -304,13 +300,13 @@ def make_gif():
         print(f"  Fetching {demo['episode']}...")
         screenshots[demo["episode"]] = fetch_screenshot(demo["url"])
 
-    # ── Scene 1: Colored block rendering (Python+Pillow mode) ────────────────
+    # ── Scene 1: Full screenshot (simulates chafa / image renderer) ─────────
 
     # Frame 1: prompt (hold 1.5s)
     frames.append(render_prompt_frame())
     durations.append(1500)
 
-    # Thinking spinner (compact — just 2 frames)
+    # Thinking spinner
     for s in ["\u28fb Thinking...", "\u28fe Thinking..."]:
         frames.append(render_thinking_frame(s))
         durations.append(500)
@@ -318,11 +314,9 @@ def make_gif():
     demo1 = DEMOS[0]
     ss1 = screenshots.get(demo1["episode"])
     if ss1:
-        block_rows = image_to_colored_blocks(ss1, cols=ASCII_COLS)
-        frames.append(render_colored_block_frame(demo1, block_rows))
+        frames.append(render_screenshot_frame(demo1, ss1, mode_label="chafa"))
         durations.append(4000)
     else:
-        # Fallback to text mode
         frames.append(render_frinkiac_text_frame(demo1))
         durations.append(4000)
 
