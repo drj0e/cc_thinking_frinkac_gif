@@ -4,7 +4,9 @@ Replace Claude Code's notification beep with a random **Simpsons screencap + quo
 
 ![Demo of Frinkiac Thinking Hook](assets/demo.gif)
 
-With an image renderer like `chafa` installed, you get the actual Simpsons screenshot/GIF rendered as terminal art. Without one, you still get the quote in a styled text frame (as shown above).
+![More examples](assets/demo2.gif)
+
+With an image renderer like `chafa` installed, you get the actual Simpsons screenshot/GIF rendered as terminal art. Without one, you still get the quote in a styled text frame. The hook automatically picks the punchline for the burned-in GIF caption so text always fits, and prints the full quote below when needed.
 
 ## How It Works
 
