@@ -37,7 +37,7 @@ DEMOS = [
     {
         "episode": "S05E18",
         "timestamp": 433715,
-        "quote": "Kids, you tried your best, and you failed miserably. The lesson is, never try.",
+        "quote": "The lesson is, never try.",
     },
     {
         "episode": "S10E19",
@@ -47,7 +47,7 @@ DEMOS = [
     {
         "episode": "S08E18",
         "timestamp": 1307739,
-        "quote": "To alcohol-- The cause of and solution to all of life's problems.",
+        "quote": "To alcohol!",
     },
     {
         "episode": "S11E10",
