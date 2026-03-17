@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./hooks/frinkiac-thinking.sh",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
