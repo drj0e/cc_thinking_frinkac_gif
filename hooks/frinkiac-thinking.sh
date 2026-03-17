@@ -9,6 +9,7 @@ set -euo pipefail
 
 FRINKIAC_API="https://frinkiac.com"
 CACHE_DIR="${TMPDIR:-/tmp}/frinkiac-cache"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 mkdir -p "$CACHE_DIR"
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -21,11 +22,78 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# ── Offline fallback: bundled ASCII art ─────────────────────────────────────
+# When the API is unreachable, show a random bundled scene instead.
+
+show_offline_fallback() {
+  local TERM_COLS=${COLUMNS:-$(tput cols 2>/dev/null || echo 80)}
+  local W=$((TERM_COLS > 60 ? 60 : TERM_COLS))
+  local bar
+  bar=$(printf '%*s' "$W" '' | tr ' ' "═")
+  local thin
+  thin=$(printf '%*s' "$W" '' | tr ' ' "─")
+
+  # Pick a random bundled scene
+  local scene=$((RANDOM % 3))
+
+  echo >&2
+
+  # Try to render a bundled PNG through chafa if available
+  local bundled_dir="${SCRIPT_DIR}/../assets/screenshots"
+  local imgs=("homer_doh.png" "bart_skateboard.png" "moes_tavern.png")
+  local episodes=("S05E09" "S08E02" "S06E13")
+  local titles=("D'oh!" "Eat my shorts!" "To alcohol!")
+
+  local img_file="${bundled_dir}/${imgs[$scene]}"
+  local ep="${episodes[$scene]}"
+
+  printf '  %s\n' "$bar" >&2
+  printf '  \xf0\x9f\x8d\xa9 FRINKIAC \xe2\x80\x94 %s (%s)\n' "${titles[$scene]}" "$ep" >&2
+  printf '  %s\n' "$thin" >&2
+
+  local showed_image=false
+  if [[ -f "$img_file" ]]; then
+    for renderer in chafa timg viu catimg; do
+      if command -v "$renderer" &>/dev/null; then
+        case "$renderer" in
+          chafa)  chafa --size="${W}x" --animate=off "$img_file" >&2 ;;
+          timg)   timg -g"${W}x" "$img_file" >&2 ;;
+          viu)    viu -w "$W" "$img_file" >&2 ;;
+          catimg) catimg -w "$W" "$img_file" >&2 ;;
+        esac
+        showed_image=true
+        break
+      fi
+    done
+  fi
+
+  printf '  %s\n' "$thin" >&2
+
+  case $scene in
+    0)
+      printf '  \xe2\x94\x82 Kids, you tried your best\n' >&2
+      printf '  \xe2\x94\x82 and you failed miserably.\n' >&2
+      printf '  \xe2\x94\x82 The lesson is, never try.\n' >&2
+      ;;
+    1)
+      printf "  \xe2\x94\x82 Everything's coming up Milhouse!\n" >&2
+      ;;
+    2)
+      printf '  \xe2\x94\x82 To alcohol!\n' >&2
+      printf '  \xe2\x94\x82 The cause of, and solution to,\n' >&2
+      printf "  \xe2\x94\x82 all of life's problems.\n" >&2
+      ;;
+  esac
+
+  printf '  %s\n' "$bar" >&2
+  echo >&2
+  exit 0
+}
+
 # ── 1. Fetch a random screencap ─────────────────────────────────────────────
 
 random_json=$(curl -sf --max-time 5 "${FRINKIAC_API}/api/random" 2>/dev/null) || {
-  stderr "Could not reach Frinkiac API"
-  exit 0  # non-blocking — exit 0 so Claude Code continues normally
+  show_offline_fallback  # API down — use bundled art
 }
 
 EPISODE=$(echo "$random_json" | jq -r '.Frame.Episode')
