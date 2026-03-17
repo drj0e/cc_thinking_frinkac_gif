@@ -98,8 +98,8 @@ def fetch_gif(demo):
     import base64
     ep = demo["episode"]
     ts = demo["timestamp"]
-    start = max(0, ts - 1500)
-    end = ts + 1500
+    start = max(0, ts - 2500)
+    end = ts + 2500
     b64 = base64.b64encode(demo["quote"].encode()).decode()
     url = f"https://frinkiac.com/gif/{ep}/{start}/{end}.gif?b64lines={b64}"
     print(f"  Fetching GIF: {ep}...")
@@ -122,8 +122,13 @@ def fetch_gif(demo):
     return None
 
 
-def extract_gif_frames(gif, max_frames=24, target_w=CLIP_MAX_W, target_h=CLIP_MAX_H):
-    """Extract and resize frames from an animated GIF."""
+def extract_gif_frames(gif, max_frames=24, target_w=CLIP_MAX_W, target_h=CLIP_MAX_H,
+                       min_duration=120):
+    """Extract and resize frames from an animated GIF.
+
+    min_duration: minimum ms per frame (slows down fast GIFs for the demo).
+    Frinkiac GIFs default to 40ms/frame which is too fast for a README demo.
+    """
     n = gif.n_frames
     # Sample frames evenly if there are too many
     step = max(1, n // max_frames)
@@ -135,7 +140,9 @@ def extract_gif_frames(gif, max_frames=24, target_w=CLIP_MAX_W, target_h=CLIP_MA
         frame = gif.convert("RGB")
         frame.thumbnail((target_w, target_h), Image.LANCZOS)
         frames.append(frame)
-        durations.append(gif.info.get("duration", 80))
+        # Slow down fast frames so clips are watchable in the demo
+        orig_dur = gif.info.get("duration", 80)
+        durations.append(max(orig_dur, min_duration))
 
     if len(frames) > max_frames:
         frames = frames[:max_frames]
@@ -289,7 +296,7 @@ def make_gif():
     demo1 = DEMOS[0]
     gif1 = gifs.get(demo1["episode"])
     if gif1 and hasattr(gif1, "n_frames") and gif1.n_frames > 1:
-        clip_frames, clip_durations = extract_gif_frames(gif1, max_frames=14)
+        clip_frames, clip_durations = extract_gif_frames(gif1, max_frames=28)
         # Calculate total height for these frames
         caption_h = LINE_H * (1 + len(demo1["caption_lines"]))
         total_h = PADDING + LINE_H * 4 + clip_frames[0].height + 8 + caption_h + PADDING
@@ -312,7 +319,7 @@ def make_gif():
     demo2 = DEMOS[1]
     gif2 = gifs.get(demo2["episode"])
     if gif2 and hasattr(gif2, "n_frames") and gif2.n_frames > 1:
-        clip_frames, clip_durations = extract_gif_frames(gif2, max_frames=12)
+        clip_frames, clip_durations = extract_gif_frames(gif2, max_frames=24)
         caption_h = LINE_H * (1 + len(demo2["caption_lines"]))
         total_h = PADDING + LINE_H * 4 + clip_frames[0].height + 8 + caption_h + PADDING
         for cf, cd in zip(clip_frames, clip_durations):
@@ -334,7 +341,7 @@ def make_gif():
         frames.append(render_homer_text_frame(demo3, typing_lines=i))
         durations.append(500)
     frames.append(render_homer_text_frame(demo3))
-    durations.append(3500)
+    durations.append(4000)
 
     # ── Normalize frame sizes and save ───────────────────────────────────────
 
