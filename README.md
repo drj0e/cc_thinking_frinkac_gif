@@ -2,16 +2,9 @@
 
 Replace Claude Code's notification beep with a random **Simpsons screencap + quote** from [Frinkiac](https://frinkiac.com) displayed right in your terminal.
 
-```
-═══════════════════════════════════════════════════════
-  🍩 FRINKIAC — S05E09
-───────────────────────────────────────────────────────
-  │ Kids, you tried your best and you failed miserably.
-  │ The lesson is, never try.
-═══════════════════════════════════════════════════════
-```
+![Demo of Frinkiac Thinking Hook](assets/demo.gif)
 
-With an image renderer like `chafa` installed, you get the actual screenshot/GIF rendered as terminal art.
+With an image renderer like `chafa` installed, you get the actual Simpsons screenshot/GIF rendered as terminal art. Without one, you still get the quote in a styled text frame (as shown above).
 
 ## How It Works
 
